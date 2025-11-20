@@ -5,14 +5,12 @@
 <title>Packing App</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<!-- FIREBASE CDN -->
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"></script>
+<!-- FIREBASE CDN (COMPAT – REQUIRED FOR GITHUB PAGES) -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
-<!-- FULL CSS -->
 <style>
-
 /* LOGIN SCREEN */
 #loginScreen {
   display:flex;
@@ -205,9 +203,9 @@ button.small { padding: 4px 10px; font-size: 0.75rem; }
   border-radius: 10px;
   margin-bottom: 10px;
 }
-
 </style>
 </head>
+
 <body>
 
 <!-- LOGIN SCREEN -->
@@ -218,7 +216,7 @@ button.small { padding: 4px 10px; font-size: 0.75rem; }
   </button>
 </div>
 
-<!-- MAIN APP (hidden until login) -->
+<!-- MAIN APP -->
 <div id="appRoot" style="display:none;">
 
 <button class="small secondary dark-toggle" onclick="toggleDarkMode()">Dark Mode</button>
@@ -229,12 +227,10 @@ button.small { padding: 4px 10px; font-size: 0.75rem; }
 
 <main>
 
-  <!-- LOGOUT BUTTON -->
   <div class="card">
     <button class="danger small" onclick="logoutUser()">Logout</button>
   </div>
 
-  <!-- CREATE TRIP -->
   <div class="card">
     <div style="margin-bottom:6px;">Create a Trip</div>
 
@@ -249,13 +245,11 @@ button.small { padding: 4px 10px; font-size: 0.75rem; }
     <button class="primary" style="margin-top:8px;" onclick="addTrip()">Add Trip</button>
   </div>
 
-  <!-- TRIP LIST -->
   <div class="card">
     <div style="margin-bottom:4px;">Your Trips</div>
     <div id="tripList"></div>
   </div>
 
-  <!-- TRIP DETAIL -->
   <div class="card" id="tripDetail" style="display:none;">
 
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">
@@ -273,7 +267,6 @@ button.small { padding: 4px 10px; font-size: 0.75rem; }
     <h2 id="tripTitle" style="margin-bottom:2px;"></h2>
     <div id="tripMeta" style="color:#777;margin-bottom:10px;font-size:0.85rem;"></div>
 
-    <!-- EDIT DATES BAR -->
     <div id="editDatesBar" class="hidden">
       <input id="editStart" type="date">
       <input id="editEnd" type="date">
@@ -285,7 +278,6 @@ button.small { padding: 4px 10px; font-size: 0.75rem; }
 
   </div>
 
-  <!-- MULTI ADD POPUP -->
   <div id="multiItemPopup" class="multi-popup hidden">
     <h4 style="margin:0 0 5px 0;">Add Multiple Items</h4>
     <textarea id="multiItemText"></textarea>
@@ -298,10 +290,9 @@ button.small { padding: 4px 10px; font-size: 0.75rem; }
 </main>
 
 </div>
+
 <script>
-/***********************************************************
- * FIREBASE INIT
- ***********************************************************/
+/********* FIREBASE INIT **********/
 const firebaseConfig = {
   apiKey: "AIzaSyDmDgvoz2Q0ObT_a2Im8QpN-sMyszqu60k",
   authDomain: "packing-app-5b537.firebaseapp.com",
@@ -315,21 +306,13 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-/***********************************************************
- * GLOBAL STATE
- ***********************************************************/
+/********* GLOBAL **********/
 let appData = { trips: [] };
 let currentUser = null;
 let currentTripId = null;
 let isDarkMode = false;
 
-/***********************************************************
- * LOGIN: GOOGLE SIGN-IN
- ***********************************************************/
-const loginScreen = document.getElementById("loginScreen");
-const appRoot = document.getElementById("appRoot");
-const googleLoginBtn = document.getElementById("googleLoginBtn");
-
+/********* LOGIN **********/
 googleLoginBtn.onclick = () => {
   const provider = new firebase.auth.GoogleAuthProvider();
   auth.signInWithPopup(provider).catch(err => alert(err.message));
@@ -337,7 +320,6 @@ googleLoginBtn.onclick = () => {
 
 auth.onAuthStateChanged(async user => {
   if (!user) {
-    currentUser = null;
     loginScreen.style.display = "flex";
     appRoot.style.display = "none";
     return;
@@ -351,16 +333,10 @@ auth.onAuthStateChanged(async user => {
   renderTripList();
 });
 
-/***********************************************************
- * LOGOUT
- ***********************************************************/
-function logoutUser() {
-  auth.signOut();
-}
+/********* LOGOUT **********/
+function logoutUser() { auth.signOut(); }
 
-/***********************************************************
- * FIRESTORE: LOAD + SAVE
- ***********************************************************/
+/********* CLOUD LOAD **********/
 async function loadFromCloud() {
   const ref = db.collection("users").doc(currentUser.uid);
   const snap = await ref.get();
@@ -373,37 +349,28 @@ async function loadFromCloud() {
   }
 }
 
-async function saveToCloud() {
-  if (!currentUser) return;
-  const ref = db.collection("users").doc(currentUser.uid);
-  await ref.set(appData, { merge: true });
-}
-
-/***********************************************************
- * MANUAL SAVE BUTTON
- ***********************************************************/
+/********* CLOUD SAVE **********/
 function manualSave() {
   saveToCloud();
   alert("Saved!");
 }
 
-/***********************************************************
- * CREATE TRIP
- ***********************************************************/
+async function saveToCloud() {
+  if (!currentUser) return;
+  await db.collection("users").doc(currentUser.uid).set(appData, { merge: true });
+}
+
+/********* ADD TRIP **********/
 function addTrip() {
   const name = tripName.value.trim();
-  const start = tripStart.value;
-  const end = tripEnd.value;
-  const dest = tripDestination.value.trim();
-
   if (!name) return alert("Trip needs a name.");
 
   appData.trips.push({
     id: Date.now().toString(),
     name,
-    start,
-    end,
-    destination: dest,
+    start: tripStart.value,
+    end: tripEnd.value,
+    destination: tripDestination.value.trim(),
     sections: [
       { id: "sec1", name: "Clothing", collapsed: false, items: [] },
       { id: "sec2", name: "Toiletries", collapsed: false, items: [] },
@@ -421,29 +388,20 @@ function addTrip() {
   tripDestination.value = "";
 }
 
-/***********************************************************
- * TRIP LIST
- ***********************************************************/
+/********* TRIP LIST **********/
 function renderTripList() {
-  const list = document.getElementById("tripList");
-  list.innerHTML = "";
-
+  tripList.innerHTML = "";
   appData.trips.forEach(t => {
-    const row = document.createElement("div");
-    row.className = "trip-list-item";
-
-    row.innerHTML = `
-      <span class="trip-title">${t.name}</span>
-      <button class="secondary small" onclick="openTrip('${t.id}')">Open</button>
+    tripList.innerHTML += `
+      <div class="trip-list-item">
+        <span class="trip-title">${t.name}</span>
+        <button class="secondary small" onclick="openTrip('${t.id}')">Open</button>
+      </div>
     `;
-
-    list.appendChild(row);
   });
 }
 
-/***********************************************************
- * OPEN TRIP
- ***********************************************************/
+/********* OPEN TRIP **********/
 function openTrip(id) {
   currentTripId = id;
   tripDetail.style.display = "block";
@@ -464,27 +422,21 @@ function closeTrip() {
   renderTripList();
 }
 
-/***********************************************************
- * FORMAT DATE (MM/DD/YYYY)
- ***********************************************************/
+/********* DATE FORMAT **********/
 function formatDate(d) {
   if (!d) return "";
   const p = d.split("-");
   return `${p[1]}/${p[2]}/${p[0]}`;
 }
 
-/***********************************************************
- * RENDER SECTIONS
- ***********************************************************/
+/********* RENDER SECTIONS **********/
 function renderSections() {
   const t = appData.trips.find(tr => tr.id === currentTripId);
-  const container = document.getElementById("sections");
-  container.innerHTML = "";
+  sections.innerHTML = "";
 
   t.sections.forEach(sec => {
     const block = document.createElement("div");
     block.className = "card";
-
     block.innerHTML = `
       <div class="section-header">
         <div class="drag-handle">☰</div>
@@ -499,47 +451,36 @@ function renderSections() {
       <button class="secondary small" onclick="addItemPrompt('${sec.id}')">+ Add Item</button>
     `;
 
-    container.appendChild(block);
+    sections.appendChild(block);
 
-    // Render items
     const itemsDiv = document.getElementById(`items-${sec.id}`);
     sec.items.forEach(it => {
-      const row = document.createElement("div");
-      row.className = "item-row";
-      row.style.opacity = it.hidden ? 0.4 : 1;
-
-      row.innerHTML = `
-        <input type="checkbox" ${it.packed ? "checked" : ""} onclick="togglePacked('${sec.id}','${it.id}')">
-        <div class="item-label" onclick="toggleHidden('${sec.id}','${it.id}')">${it.label}</div>
-        <input class="item-qty" type="number" min="1" value="${it.qty}" onchange="changeQty('${sec.id}','${it.id}', this.value)">
-        <button class="secondary small" onclick="editItem('${sec.id}','${it.id}')">Edit</button>
-        <button class="danger small" onclick="deleteItem('${sec.id}','${it.id}')">X</button>
+      itemsDiv.innerHTML += `
+        <div class="item-row" style="opacity:${it.hidden ? 0.4 : 1}">
+          <input type="checkbox" ${it.packed ? "checked" : ""} onclick="togglePacked('${sec.id}','${it.id}')">
+          <div class="item-label" onclick="toggleHidden('${sec.id}','${it.id}')">${it.label}</div>
+          <input class="item-qty" type="number" min="1" value="${it.qty}" onchange="changeQty('${sec.id}','${it.id}', this.value)">
+          <button class="secondary small" onclick="editItem('${sec.id}','${it.id}')">Edit</button>
+          <button class="danger small" onclick="deleteItem('${sec.id}','${it.id}')">X</button>
+        </div>
       `;
-
-      itemsDiv.appendChild(row);
     });
   });
 }
 
-/***********************************************************
- * COLLAPSE CATEGORY
- ***********************************************************/
+/********* COLLAPSE **********/
 function toggleCollapse(secId) {
   const t = appData.trips.find(tr => tr.id === currentTripId);
   const sec = t.sections.find(s => s.id === secId);
-
   sec.collapsed = !sec.collapsed;
   saveToCloud();
   renderSections();
 }
 
-/***********************************************************
- * ITEM OPERATIONS
- ***********************************************************/
+/********* ITEM OPERATIONS **********/
 function addItemPrompt(secId) {
   const label = prompt("Item name:");
   if (!label) return;
-
   const qty = parseInt(prompt("Quantity:", "1")) || 1;
 
   const t = appData.trips.find(tr => tr.id === currentTripId);
@@ -561,7 +502,6 @@ function togglePacked(secId, itemId) {
   const t = appData.trips.find(tr => tr.id === currentTripId);
   const sec = t.sections.find(s => s.id === secId);
   const it = sec.items.find(i => i.id === itemId);
-
   it.packed = !it.packed;
   saveToCloud();
 }
@@ -570,7 +510,6 @@ function toggleHidden(secId, itemId) {
   const t = appData.trips.find(tr => tr.id === currentTripId);
   const sec = t.sections.find(s => s.id === secId);
   const it = sec.items.find(i => i.id === itemId);
-
   it.hidden = !it.hidden;
   saveToCloud();
   renderSections();
@@ -580,7 +519,6 @@ function changeQty(secId, itemId, qty) {
   const t = appData.trips.find(tr => tr.id === currentTripId);
   const sec = t.sections.find(s => s.id === secId);
   const it = sec.items.find(i => i.id === itemId);
-
   it.qty = parseInt(qty) || 1;
   saveToCloud();
 }
@@ -601,22 +539,16 @@ function editItem(secId, itemId) {
 function deleteItem(secId, itemId) {
   const t = appData.trips.find(tr => tr.id === currentTripId);
   const sec = t.sections.find(s => s.id === secId);
-
   sec.items = sec.items.filter(i => i.id !== itemId);
   saveToCloud();
   renderSections();
 }
 
-/***********************************************************
- * RESET + UNHIDE
- ***********************************************************/
+/********* RESET + UNHIDE **********/
 function resetTrip() {
   const t = appData.trips.find(tr => tr.id === currentTripId);
   t.sections.forEach(sec =>
-    sec.items.forEach(i => {
-      i.packed = false;
-      i.hidden = false;
-    })
+    sec.items.forEach(i => { i.packed = false; i.hidden = false; })
   );
   saveToCloud();
   renderSections();
@@ -629,21 +561,17 @@ function unhideAll() {
   renderSections();
 }
 
-/***********************************************************
- * DARK MODE
- ***********************************************************/
+/********* DARK MODE **********/
 function toggleDarkMode() {
   isDarkMode = !isDarkMode;
   document.body.classList.toggle("dark", isDarkMode);
 }
 
-/***********************************************************
- * EDIT TRIP DATES
- ***********************************************************/
+/********* EDIT TRIP DATES **********/
 function showEditDates() {
   editDatesBar.classList.remove("hidden");
-
   const t = appData.trips.find(tr => tr.id === currentTripId);
+
   editStart.value = t.start;
   editEnd.value = t.end;
   editDest.value = t.destination;
@@ -654,14 +582,13 @@ function saveTripDates() {
   t.start = editStart.value;
   t.end = editEnd.value;
   t.destination = editDest.value;
+
   saveToCloud();
   renderSections();
   editDatesBar.classList.add("hidden");
 }
 
-/***********************************************************
- * RENAME TRIP
- ***********************************************************/
+/********* RENAME TRIP **********/
 function renameTrip() {
   const t = appData.trips.find(tr => tr.id === currentTripId);
   const name = prompt("New trip name:", t.name);
@@ -671,9 +598,7 @@ function renameTrip() {
   openTrip(currentTripId);
 }
 
-/***********************************************************
- * DUPLICATE TRIP
- ***********************************************************/
+/********* DUPLICATE TRIP **********/
 function duplicateTrip() {
   const t = appData.trips.find(tr => tr.id === currentTripId);
   const copy = JSON.parse(JSON.stringify(t));
@@ -684,9 +609,7 @@ function duplicateTrip() {
   renderTripList();
 }
 
-/***********************************************************
- * DELETE TRIP
- ***********************************************************/
+/********* DELETE TRIP **********/
 function deleteTrip() {
   if (!confirm("Delete this trip?")) return;
   appData.trips = appData.trips.filter(t => t.id !== currentTripId);
@@ -695,22 +618,17 @@ function deleteTrip() {
   renderTripList();
 }
 
-/***********************************************************
- * MULTIPLE ITEMS POPUP (placeholder)
- ***********************************************************/
+/********* MULTI-ITEM POPUP (disabled for cloud version) **********/
 function addCustomItem() {
   alert("Tap a category's + Add Item button.");
 }
-
 function closeMultiPopup() {
   multiItemPopup.classList.add("hidden");
 }
-
 function applyMultipleItems() {
   alert("Multi-item add is not enabled for cloud version.");
   closeMultiPopup();
 }
-
 </script>
 
 </body>
