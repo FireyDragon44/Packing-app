@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Packing App</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- FIREBASE CDN -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"></script>
+
+<!-- FULL CSS -->
+<style>
+
+/* LOGIN SCREEN */
+#loginScreen {
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
+  flex-direction:column;
+  gap:20px;
+}
+#loginScreen h1 {
+  margin: 0;
+  font-size: 2rem;
+  color: #222;
+}
+
+/* THEME */
+:root {
+  --bg: #f4f4f7;
+  --card: #ffffff;
+  --text: #222;
+  --border: #ccc;
+
+  --button: #4b6cb7;
+  --button-text: #fff;
+
+  --secondary: #eee;
+  --secondary-text: #333;
+
+  --danger: #ffdddd;
+  --danger-text: #a00;
+
+  --row-width: 650px;
+}
+
+/* DARK MODE */
+.dark {
+  --bg: #1e1e23;
+  --card: #2a2a30;
+  --text: #f1f1f1;
+  --border: #555;
+
+  --button: #6d8aff;
+  --button-text: #fff;
+
+  --secondary: #444;
+  --secondary-text: #fff;
+
+  --danger: #5a1c1c;
+  --danger-text: #ffbcbc;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  transition: 0.3s ease;
+}
+
+header {
+  padding: 16px;
+  text-align: center;
+  background: linear-gradient(135deg,#4b6cb7,#182848);
+  color: white;
+}
+
+main {
+  padding: 14px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* Cards */
+.card {
+  background: var(--card);
+  padding: 14px;
+  border-radius: 10px;
+  margin-bottom: 15px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+/* Buttons */
+button {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+button.primary { background: var(--button); color: var(--button-text); }
+button.secondary { background: var(--secondary); color: var(--secondary-text); }
+button.danger { background: var(--danger); color: var(--danger-text); }
+button.small { padding: 4px 10px; font-size: 0.75rem; }
+
+.dark-toggle {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 999;
+}
+
+/* Trip List */
+.trip-list-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.trip-title { font-weight: 600; }
+
+/* CATEGORY HEADER */
+.section-header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Collapse Button */
+.collapse-btn {
+  font-size: 1rem;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--secondary);
+  color: var(--secondary-text);
+  cursor: pointer;
+  margin-right: 6px;
+}
+
+/* Drag Handle */
+.drag-handle {
+  font-size: 1rem;
+  cursor: grab;
+  padding-right: 5px;
+  user-select: none;
+}
+
+/* Items Container */
+.items-container {
+  margin-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Item Row */
+.item-row {
+  width: var(--row-width);
+  max-width: 100%;
+  display: grid;
+  grid-template-columns: 24px 1fr 50px auto auto;
+  gap: 12px;
+  padding: 5px 0;
+  align-items: center;
+}
+
+.item-label { font-size: 0.9rem; }
+.item-qty { width: 45px; padding: 4px; }
+
+/* Multi Item Popup */
+.multi-popup {
+  position: absolute;
+  background: var(--card);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px;
+  width: 260px;
+  border: 1px solid var(--border);
+  box-shadow: 0 3px 15px rgba(0,0,0,0.25);
+  z-index: 99999;
+}
+.multi-popup textarea {
+  width: 100%;
+  height: 90px;
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.hidden { display:none !important; }
+
+/* Edit Dates Bar */
+#editDatesBar {
+  padding: 8px;
+  background: var(--secondary);
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen">
+  <h1>Packing App</h1>
+  <button id="googleLoginBtn" class="primary" style="font-size:1rem;padding:10px 20px;">
+    Sign in with Google
+  </button>
+</div>
+
+<!-- MAIN APP (hidden until login) -->
+<div id="appRoot" style="display:none;">
+
+<button class="small secondary dark-toggle" onclick="toggleDarkMode()">Dark Mode</button>
+
+<header>
+  <h1>Packing App</h1>
+</header>
+
+<main>
+
+  <!-- LOGOUT BUTTON -->
+  <div class="card">
+    <button class="danger small" onclick="logoutUser()">Logout</button>
+  </div>
+
+  <!-- CREATE TRIP -->
+  <div class="card">
+    <div style="margin-bottom:6px;">Create a Trip</div>
+
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:6px;">
+      <input id="tripName" type="text" placeholder="Trip name">
+      <input id="tripStart" type="date">
+      <input id="tripEnd" type="date">
+    </div>
+
+    <input id="tripDestination" type="text" placeholder="Destination" style="margin-top:6px;">
+
+    <button class="primary" style="margin-top:8px;" onclick="addTrip()">Add Trip</button>
+  </div>
+
+  <!-- TRIP LIST -->
+  <div class="card">
+    <div style="margin-bottom:4px;">Your Trips</div>
+    <div id="tripList"></div>
+  </div>
+
+  <!-- TRIP DETAIL -->
+  <div class="card" id="tripDetail" style="display:none;">
+
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">
+      <button class="secondary small" onclick="closeTrip()">Back</button>
+      <button class="secondary small" onclick="renameTrip()">Edit Trip Name</button>
+      <button class="secondary small" onclick="showEditDates()">Edit Trip Dates</button>
+      <button class="secondary small" onclick="duplicateTrip()">Duplicate Trip</button>
+      <button class="secondary small" onclick="resetTrip()">Uncheck All</button>
+      <button class="secondary small" onclick="unhideAll()">Unhide All</button>
+      <button class="secondary small" onclick="addCustomItem()">Add Custom Item</button>
+      <button class="danger small" onclick="deleteTrip()">Delete Trip</button>
+      <button class="primary small" onclick="manualSave()">Save</button>
+    </div>
+
+    <h2 id="tripTitle" style="margin-bottom:2px;"></h2>
+    <div id="tripMeta" style="color:#777;margin-bottom:10px;font-size:0.85rem;"></div>
+
+    <!-- EDIT DATES BAR -->
+    <div id="editDatesBar" class="hidden">
+      <input id="editStart" type="date">
+      <input id="editEnd" type="date">
+      <input id="editDest" type="text" placeholder="Destination">
+      <button class="primary small" onclick="saveTripDates()">Save</button>
+    </div>
+
+    <div id="sections"></div>
+
+  </div>
+
+  <!-- MULTI ADD POPUP -->
+  <div id="multiItemPopup" class="multi-popup hidden">
+    <h4 style="margin:0 0 5px 0;">Add Multiple Items</h4>
+    <textarea id="multiItemText"></textarea>
+    <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px;">
+      <button class="secondary small" onclick="closeMultiPopup()">Cancel</button>
+      <button class="primary small" onclick="applyMultipleItems()">Add</button>
+    </div>
+  </div>
+
+</main>
+
+</div>
+<script>
+/***********************************************************
+ * FIREBASE INIT
+ ***********************************************************/
+const firebaseConfig = {
+  apiKey: "AIzaSyDmDgvoz2Q0ObT_a2Im8QpN-sMyszqu60k",
+  authDomain: "packing-app-5b537.firebaseapp.com",
+  projectId: "packing-app-5b537",
+  storageBucket: "packing-app-5b537.firebasestorage.app",
+  messagingSenderId: "873774021522",
+  appId: "1:873774021522:web:7c1753f80fcec5ecf39f4b"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+/***********************************************************
+ * GLOBAL STATE
+ ***********************************************************/
+let appData = { trips: [] };
+let currentUser = null;
+let currentTripId = null;
+let isDarkMode = false;
+
+/***********************************************************
+ * LOGIN: GOOGLE SIGN-IN
+ ***********************************************************/
+const loginScreen = document.getElementById("loginScreen");
+const appRoot = document.getElementById("appRoot");
+const googleLoginBtn = document.getElementById("googleLoginBtn");
+
+googleLoginBtn.onclick = () => {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch(err => alert(err.message));
+};
+
+auth.onAuthStateChanged(async user => {
+  if (!user) {
+    currentUser = null;
+    loginScreen.style.display = "flex";
+    appRoot.style.display = "none";
+    return;
+  }
+
+  currentUser = user;
+  loginScreen.style.display = "none";
+  appRoot.style.display = "block";
+
+  await loadFromCloud();
+  renderTripList();
+});
+
+/***********************************************************
+ * LOGOUT
+ ***********************************************************/
+function logoutUser() {
+  auth.signOut();
+}
+
+/***********************************************************
+ * FIRESTORE: LOAD + SAVE
+ ***********************************************************/
+async function loadFromCloud() {
+  const ref = db.collection("users").doc(currentUser.uid);
+  const snap = await ref.get();
+
+  if (!snap.exists) {
+    await ref.set({ trips: [] });
+    appData = { trips: [] };
+  } else {
+    appData = snap.data() || { trips: [] };
+  }
+}
+
+async function saveToCloud() {
+  if (!currentUser) return;
+  const ref = db.collection("users").doc(currentUser.uid);
+  await ref.set(appData, { merge: true });
+}
+
+/***********************************************************
+ * MANUAL SAVE BUTTON
+ ***********************************************************/
+function manualSave() {
+  saveToCloud();
+  alert("Saved!");
+}
+
+/***********************************************************
+ * CREATE TRIP
+ ***********************************************************/
+function addTrip() {
+  const name = tripName.value.trim();
+  const start = tripStart.value;
+  const end = tripEnd.value;
+  const dest = tripDestination.value.trim();
+
+  if (!name) return alert("Trip needs a name.");
+
+  appData.trips.push({
+    id: Date.now().toString(),
+    name,
+    start,
+    end,
+    destination: dest,
+    sections: [
+      { id: "sec1", name: "Clothing", collapsed: false, items: [] },
+      { id: "sec2", name: "Toiletries", collapsed: false, items: [] },
+      { id: "sec3", name: "Electronics", collapsed: false, items: [] },
+      { id: "sec4", name: "Must-Not-Forget", collapsed: false, items: [] }
+    ]
+  });
+
+  saveToCloud();
+  renderTripList();
+
+  tripName.value = "";
+  tripStart.value = "";
+  tripEnd.value = "";
+  tripDestination.value = "";
+}
+
+/***********************************************************
+ * TRIP LIST
+ ***********************************************************/
+function renderTripList() {
+  const list = document.getElementById("tripList");
+  list.innerHTML = "";
+
+  appData.trips.forEach(t => {
+    const row = document.createElement("div");
+    row.className = "trip-list-item";
+
+    row.innerHTML = `
+      <span class="trip-title">${t.name}</span>
+      <button class="secondary small" onclick="openTrip('${t.id}')">Open</button>
+    `;
+
+    list.appendChild(row);
+  });
+}
+
+/***********************************************************
+ * OPEN TRIP
+ ***********************************************************/
+function openTrip(id) {
+  currentTripId = id;
+  tripDetail.style.display = "block";
+
+  const t = appData.trips.find(tr => tr.id === id);
+  tripTitle.textContent = t.name;
+
+  tripMeta.textContent =
+    `${formatDate(t.start)} → ${formatDate(t.end)}` +
+    (t.destination ? ` • ${t.destination}` : "");
+
+  renderSections();
+}
+
+function closeTrip() {
+  tripDetail.style.display = "none";
+  currentTripId = null;
+  renderTripList();
+}
+
+/***********************************************************
+ * FORMAT DATE (MM/DD/YYYY)
+ ***********************************************************/
+function formatDate(d) {
+  if (!d) return "";
+  const p = d.split("-");
+  return `${p[1]}/${p[2]}/${p[0]}`;
+}
+
+/***********************************************************
+ * RENDER SECTIONS
+ ***********************************************************/
+function renderSections() {
+  const t = appData.trips.find(tr => tr.id === currentTripId);
+  const container = document.getElementById("sections");
+  container.innerHTML = "";
+
+  t.sections.forEach(sec => {
+    const block = document.createElement("div");
+    block.className = "card";
+
+    block.innerHTML = `
+      <div class="section-header">
+        <div class="drag-handle">☰</div>
+        <strong>${sec.name}</strong>
+        <button class="collapse-btn" onclick="toggleCollapse('${sec.id}')">
+          ${sec.collapsed ? "+" : "-"}
+        </button>
+      </div>
+
+      <div id="items-${sec.id}" class="items-container" style="${sec.collapsed ? "display:none" : ""}"></div>
+
+      <button class="secondary small" onclick="addItemPrompt('${sec.id}')">+ Add Item</button>
+    `;
+
+    container.appendChild(block);
+
+    // Render items
+    const itemsDiv = document.getElementById(`items-${sec.id}`);
+    sec.items.forEach(it => {
+      const row = document.createElement("div");
+      row.className = "item-row";
+      row.style.opacity = it.hidden ? 0.4 : 1;
+
+      row.innerHTML = `
+        <input type="checkbox" ${it.packed ? "checked" : ""} onclick="togglePacked('${sec.id}','${it.id}')">
+        <div class="item-label" onclick="toggleHidden('${sec.id}','${it.id}')">${it.label}</div>
+        <input class="item-qty" type="number" min="1" value="${it.qty}" onchange="changeQty('${sec.id}','${it.id}', this.value)">
+        <button class="secondary small" onclick="editItem('${sec.id}','${it.id}')">Edit</button>
+        <button class="danger small" onclick="deleteItem('${sec.id}','${it.id}')">X</button>
+      `;
+
+      itemsDiv.appendChild(row);
+    });
+  });
+}
+
+/***********************************************************
+ * COLLAPSE CATEGORY
+ ***********************************************************/
+function toggleCollapse(secId) {
+  const t = appData.trips.find(tr => tr.id === currentTripId);
+  const sec = t.sections.find(s => s.id === secId);
+
+  sec.collapsed = !sec.collapsed;
+  saveToCloud();
+  renderSections();
+}
+
+/***********************************************************
+ * ITEM OPERATIONS
+ ***********************************************************/
+function addItemPrompt(secId) {
+  const label = prompt("Item name:");
+  if (!label) return;
+
+  const qty = parseInt(prompt("Quantity:", "1")) || 1;
+
+  const t = appData.trips.find(tr => tr.id === currentTripId);
+  const sec = t.sections.find(s => s.id === secId);
+
+  sec.items.push({
+    id: Date.now().toString(),
+    label,
+    qty,
+    packed: false,
+    hidden: false
+  });
+
+  saveToCloud();
+  renderSections();
+}
+
+function togglePacked(secId, itemId) {
+  const t = appData.trips.find(tr => tr.id === currentTripId);
+  const sec = t.sections.find(s => s.id === secId);
+  const it = sec.items.find(i => i.id === itemId);
+
+  it.packed = !it.packed;
+  saveToCloud();
+}
+
+function toggleHidden(secId, itemId) {
+  const t = appData.trips.find(tr => tr.id === currentTripId);
+  const sec = t.sections.find(s => s.id === secId);
+  const it = sec.items.find(i => i.id === itemId);
+
+  it.hidden = !it.hidden;
+  saveToCloud();
+  renderSections();
+}
+
+function changeQty(secId, itemId, qty) {
+  const t = appData.trips.find(tr => tr.id === currentTripId);
+  const sec = t.sections.find(s => s.id === secId);
+  const it = sec.items.find(i => i.id === itemId);
+
+  it.qty = parseInt(qty) || 1;
+  saveToCloud();
+}
+
+function editItem(secId, itemId) {
+  const t = appData.trips.find(tr => tr.id === currentTripId);
+  const sec = t.sections.find(s => s.id === secId);
+  const it = sec.items.find(i => i.id === itemId);
+
+  const newLabel = prompt("Edit item:", it.label);
+  if (!newLabel) return;
+
+  it.label = newLabel;
+  saveToCloud();
+  renderSections();
+}
+
+function deleteItem(secId, itemId) {
+  const t = appData.trips.find(tr => tr.id === currentTripId);
+  const sec = t.sections.find(s => s.id === secId);
+
+  sec.items = sec.items.filter(i => i.id !== itemId);
+  saveToCloud();
+  renderSections();
+}
+
+/***********************************************************
+ * RESET + UNHIDE
+ ***********************************************************/
+function resetTrip() {
+  const t = appData.trips.find(tr => tr.id === currentTripId);
+  t.sections.forEach(sec =>
+    sec.items.forEach(i => {
+      i.packed = false;
+      i.hidden = false;
+    })
+  );
+  saveToCloud();
+  renderSections();
+}
+
+function unhideAll() {
+  const t = appData.trips.find(tr => tr.id === currentTripId);
+  t.sections.forEach(sec => sec.items.forEach(i => i.hidden = false));
+  saveToCloud();
+  renderSections();
+}
+
+/***********************************************************
+ * DARK MODE
+ ***********************************************************/
+function toggleDarkMode() {
+  isDarkMode = !isDarkMode;
+  document.body.classList.toggle("dark", isDarkMode);
+}
+
+/***********************************************************
+ * EDIT TRIP DATES
+ ***********************************************************/
+function showEditDates() {
+  editDatesBar.classList.remove("hidden");
+
+  const t = appData.trips.find(tr => tr.id === currentTripId);
+  editStart.value = t.start;
+  editEnd.value = t.end;
+  editDest.value = t.destination;
+}
+
+function saveTripDates() {
+  const t = appData.trips.find(tr => tr.id === currentTripId);
+  t.start = editStart.value;
+  t.end = editEnd.value;
+  t.destination = editDest.value;
+  saveToCloud();
+  renderSections();
+  editDatesBar.classList.add("hidden");
+}
+
+/***********************************************************
+ * RENAME TRIP
+ ***********************************************************/
+function renameTrip() {
+  const t = appData.trips.find(tr => tr.id === currentTripId);
+  const name = prompt("New trip name:", t.name);
+  if (!name) return;
+  t.name = name;
+  saveToCloud();
+  openTrip(currentTripId);
+}
+
+/***********************************************************
+ * DUPLICATE TRIP
+ ***********************************************************/
+function duplicateTrip() {
+  const t = appData.trips.find(tr => tr.id === currentTripId);
+  const copy = JSON.parse(JSON.stringify(t));
+  copy.id = Date.now().toString();
+  copy.name += " (Copy)";
+  appData.trips.push(copy);
+  saveToCloud();
+  renderTripList();
+}
+
+/***********************************************************
+ * DELETE TRIP
+ ***********************************************************/
+function deleteTrip() {
+  if (!confirm("Delete this trip?")) return;
+  appData.trips = appData.trips.filter(t => t.id !== currentTripId);
+  saveToCloud();
+  closeTrip();
+  renderTripList();
+}
+
+/***********************************************************
+ * MULTIPLE ITEMS POPUP (placeholder)
+ ***********************************************************/
+function addCustomItem() {
+  alert("Tap a category's + Add Item button.");
+}
+
+function closeMultiPopup() {
+  multiItemPopup.classList.add("hidden");
+}
+
+function applyMultipleItems() {
+  alert("Multi-item add is not enabled for cloud version.");
+  closeMultiPopup();
+}
+
+</script>
+
+</body>
+</html>
